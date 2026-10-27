@@ -1,24 +1,24 @@
 [
   {
     "route": "/",
-    "firstLoadUncompressedJsBytes": 384904,
+    "firstLoadUncompressedJsBytes": 395689,
     "firstLoadChunkPaths": [
-      ".next/static/chunks/24mspnv49xmry.js",
+      ".next/static/chunks/07meue0kb1wo_.js",
       ".next/static/chunks/2d8eojau8dio7.js",
-      ".next/static/chunks/3xyfqven255f5.js",
-      ".next/static/chunks/turbopack-344jwky3kxk_0.js",
+      ".next/static/chunks/2imk-i558o-m0.js",
+      ".next/static/chunks/turbopack-3a1ypoq590-vh.js",
       ".next/static/chunks/2qx-mp6eo9myl.js",
       ".next/static/chunks/turbopack-2kdq77zszof-j.js"
     ]
   },
   {
     "route": "/InvoiceApp",
-    "firstLoadUncompressedJsBytes": 384730,
+    "firstLoadUncompressedJsBytes": 395515,
     "firstLoadChunkPaths": [
-      ".next/static/chunks/35bz7fjsri3vm.js",
+      ".next/static/chunks/35ttub56asxkh.js",
       ".next/static/chunks/2d8eojau8dio7.js",
-      ".next/static/chunks/3xyfqven255f5.js",
-      ".next/static/chunks/turbopack-2d0w6bmnvq_2e.js",
+      ".next/static/chunks/2imk-i558o-m0.js",
+      ".next/static/chunks/turbopack-2_pz_8ofnwcnd.js",
       ".next/static/chunks/2qx-mp6eo9myl.js",
       ".next/static/chunks/turbopack-2kdq77zszof-j.js"
     ]

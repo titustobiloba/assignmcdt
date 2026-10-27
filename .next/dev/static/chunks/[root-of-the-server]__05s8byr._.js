@@ -46,6 +46,17 @@ const currencies = [
     'NGN'
 ];
 const today = new Date().toISOString().slice(0, 10);
+const defaultBusiness = {
+    name: '',
+    email: '',
+    address: ''
+};
+function businessInitials(name) {
+    return name.trim().split(/\s+/).slice(0, 2).map((part)=>part[0]).join('').toUpperCase() || 'TL';
+}
+function businessStorageKey(email) {
+    return `ledger-business:${email.toLowerCase()}`;
+}
 function createInvoice(id = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`) {
     const date = new Date();
     const due = new Date(date);
@@ -92,19 +103,60 @@ function InvoiceApp() {
         "InvoiceApp.useState": ()=>createInvoice('INV-2026-0001')
     }["InvoiceApp.useState"]);
     const [invoices, setInvoices] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$index$2e$js__$5b$client$5d$__$28$ecmascript$29$__["useState"])([]);
+    const [clients, setClients] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$index$2e$js__$5b$client$5d$__$28$ecmascript$29$__["useState"])([]);
+    const [clientForm, setClientForm] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$index$2e$js__$5b$client$5d$__$28$ecmascript$29$__["useState"])({
+        name: '',
+        email: '',
+        address: ''
+    });
+    const [clientError, setClientError] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$index$2e$js__$5b$client$5d$__$28$ecmascript$29$__["useState"])('');
+    const [business, setBusiness] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$index$2e$js__$5b$client$5d$__$28$ecmascript$29$__["useState"])(defaultBusiness);
+    const [businessForm, setBusinessForm] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$index$2e$js__$5b$client$5d$__$28$ecmascript$29$__["useState"])(defaultBusiness);
+    const [editingBusiness, setEditingBusiness] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$index$2e$js__$5b$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const [activeView, setActiveView] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$index$2e$js__$5b$client$5d$__$28$ecmascript$29$__["useState"])('editor');
     const [notice, setNotice] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$index$2e$js__$5b$client$5d$__$28$ecmascript$29$__["useState"])('');
     const [authUser, setAuthUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$index$2e$js__$5b$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const [authReady, setAuthReady] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$index$2e$js__$5b$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const [accountOpen, setAccountOpen] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$index$2e$js__$5b$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const [loginError, setLoginError] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$index$2e$js__$5b$client$5d$__$28$ecmascript$29$__["useState"])('');
+    const [authMode, setAuthMode] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$index$2e$js__$5b$client$5d$__$28$ecmascript$29$__["useState"])('signin');
+    const [resetSubmitted, setResetSubmitted] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$index$2e$js__$5b$client$5d$__$28$ecmascript$29$__["useState"])(false);
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$index$2e$js__$5b$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "InvoiceApp.useEffect": ()=>{
             try {
                 const saved = window.localStorage.getItem('ledger-invoices');
                 if (saved) setInvoices(JSON.parse(saved));
+                const savedClients = window.localStorage.getItem('ledger-clients');
+                if (savedClients) setClients(JSON.parse(savedClients));
+                const savedBusiness = window.localStorage.getItem('ledger-business');
+                if (savedBusiness) {
+                    const businessDetails = {
+                        ...defaultBusiness,
+                        ...JSON.parse(savedBusiness)
+                    };
+                    setBusiness(businessDetails);
+                    setBusinessForm(businessDetails);
+                }
                 const savedUser = window.localStorage.getItem('ledger-account');
-                if (savedUser) setAuthUser(JSON.parse(savedUser));
+                if (savedUser) {
+                    const user = JSON.parse(savedUser);
+                    setAuthUser(user);
+                    const personalBusiness = window.localStorage.getItem(businessStorageKey(user.email));
+                    const legacyBusiness = window.localStorage.getItem('ledger-business');
+                    const businessDetails = personalBusiness ? {
+                        ...defaultBusiness,
+                        ...JSON.parse(personalBusiness)
+                    } : legacyBusiness ? {
+                        ...defaultBusiness,
+                        ...JSON.parse(legacyBusiness)
+                    } : defaultBusiness;
+                    setBusiness(businessDetails);
+                    setBusinessForm(businessDetails);
+                    if (!personalBusiness && legacyBusiness) {
+                        window.localStorage.setItem(businessStorageKey(user.email), JSON.stringify(businessDetails));
+                        window.localStorage.removeItem('ledger-business');
+                    }
+                }
             } catch  {
                 setInvoices([]);
                 window.localStorage.removeItem('ledger-account');
@@ -173,6 +225,61 @@ function InvoiceApp() {
         setInvoice(createInvoice());
         setActiveView('editor');
     }
+    function addClient(event) {
+        event.preventDefault();
+        const name = clientForm.name.trim();
+        if (!name) {
+            setClientError('Enter a client name to continue.');
+            return;
+        }
+        if (clients.some((client)=>client.name.toLowerCase() === name.toLowerCase())) {
+            setClientError('A client with this name already exists.');
+            return;
+        }
+        const next = [
+            ...clients,
+            {
+                id: Date.now(),
+                name,
+                email: clientForm.email.trim(),
+                address: clientForm.address.trim()
+            }
+        ];
+        setClients(next);
+        window.localStorage.setItem('ledger-clients', JSON.stringify(next));
+        setClientForm({
+            name: '',
+            email: '',
+            address: ''
+        });
+        setClientError('');
+        setNotice('Client added');
+        window.setTimeout(()=>setNotice(''), 2400);
+    }
+    function selectClient(clientId) {
+        const client = clients.find((item)=>String(item.id) === clientId);
+        if (!client) return;
+        setInvoice((current)=>({
+                ...current,
+                client: client.name,
+                email: client.email,
+                address: client.address
+            }));
+    }
+    function saveBusiness(event) {
+        event.preventDefault();
+        const updatedBusiness = {
+            name: businessForm.name.trim(),
+            email: businessForm.email.trim(),
+            address: businessForm.address.trim()
+        };
+        if (!updatedBusiness.name) return;
+        setBusiness(updatedBusiness);
+        window.localStorage.setItem(businessStorageKey(authUser.email), JSON.stringify(updatedBusiness));
+        setEditingBusiness(false);
+        setNotice('Business details updated');
+        window.setTimeout(()=>setNotice(''), 2400);
+    }
     function signIn(event) {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
@@ -180,11 +287,51 @@ function InvoiceApp() {
         const name = email.split('@')[0].split(/[._-]/).map((part)=>part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
         const user = {
             email,
-            name: name || 'Account'
+            name: name || 'Account',
+            accountType: 'person'
         };
+        const savedBusiness = window.localStorage.getItem(businessStorageKey(email));
+        const businessDetails = savedBusiness ? {
+            ...defaultBusiness,
+            ...JSON.parse(savedBusiness)
+        } : defaultBusiness;
         window.localStorage.setItem('ledger-account', JSON.stringify(user));
         setAuthUser(user);
+        setBusiness(businessDetails);
+        setBusinessForm(businessDetails);
         setLoginError('');
+    }
+    function signUp(event) {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        const password = String(formData.get('password'));
+        const confirmPassword = String(formData.get('confirmPassword'));
+        if (password !== confirmPassword) {
+            setLoginError('Your passwords do not match.');
+            return;
+        }
+        const email = String(formData.get('email')).trim().toLowerCase();
+        const name = String(formData.get('name')).trim();
+        const newBusiness = {
+            name: String(formData.get('businessName')).trim(),
+            email: String(formData.get('businessEmail')).trim() || email,
+            address: String(formData.get('businessAddress')).trim()
+        };
+        const user = {
+            email,
+            name,
+            accountType: 'person'
+        };
+        window.localStorage.setItem('ledger-account', JSON.stringify(user));
+        window.localStorage.setItem(businessStorageKey(email), JSON.stringify(newBusiness));
+        setBusiness(newBusiness);
+        setBusinessForm(newBusiness);
+        setAuthUser(user);
+        setLoginError('');
+    }
+    function requestPasswordReset(event) {
+        event.preventDefault();
+        setResetSubmitted(true);
     }
     function signOut() {
         window.localStorage.removeItem('ledger-account');
@@ -198,17 +345,17 @@ function InvoiceApp() {
                 children: "Titus Ledger | Sign in"
             }, void 0, false, {
                 fileName: "[project]/pages/InvoiceApp.jsx",
-                lineNumber: 116,
+                lineNumber: 228,
                 columnNumber: 67
             }, this)
         }, void 0, false, {
             fileName: "[project]/pages/InvoiceApp.jsx",
-            lineNumber: 116,
+            lineNumber: 228,
             columnNumber: 61
         }, this)
     }, void 0, false, {
         fileName: "[project]/pages/InvoiceApp.jsx",
-        lineNumber: 116,
+        lineNumber: 228,
         columnNumber: 26
     }, this);
     if (!authUser) return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -217,24 +364,27 @@ function InvoiceApp() {
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$head$2e$js__$5b$client$5d$__$28$ecmascript$29$__["default"], {
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("title", {
-                        children: "Sign in | Titus Ledger"
-                    }, void 0, false, {
+                        children: [
+                            authMode === 'signup' ? 'Create account' : authMode === 'reset' ? 'Reset password' : 'Sign in',
+                            " | Titus Ledger"
+                        ]
+                    }, void 0, true, {
                         fileName: "[project]/pages/InvoiceApp.jsx",
-                        lineNumber: 119,
+                        lineNumber: 231,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("meta", {
                         name: "description",
-                        content: "Sign in to your Titus Ledger invoice workspace."
+                        content: "Access your Titus Ledger invoice workspace."
                     }, void 0, false, {
                         fileName: "[project]/pages/InvoiceApp.jsx",
-                        lineNumber: 119,
-                        columnNumber: 48
+                        lineNumber: 231,
+                        columnNumber: 137
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/pages/InvoiceApp.jsx",
-                lineNumber: 119,
+                lineNumber: 231,
                 columnNumber: 5
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("main", {
@@ -249,7 +399,7 @@ function InvoiceApp() {
                                 children: "TL"
                             }, void 0, false, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 121,
+                                lineNumber: 233,
                                 columnNumber: 57
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -260,137 +410,573 @@ function InvoiceApp() {
                                         children: "."
                                     }, void 0, false, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 121,
+                                        lineNumber: 233,
                                         columnNumber: 119
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 121,
+                                lineNumber: 233,
                                 columnNumber: 101
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/pages/InvoiceApp.jsx",
-                        lineNumber: 121,
+                        lineNumber: 233,
                         columnNumber: 7
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
                         className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authPanel,
                         children: [
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].overline,
-                                children: "YOUR BILLING WORKSPACE"
-                            }, void 0, false, {
-                                fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 123,
-                                columnNumber: 9
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
-                                children: "Welcome back."
-                            }, void 0, false, {
-                                fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 124,
-                                columnNumber: 9
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authIntro,
-                                children: "Sign in to manage your invoices and client details."
-                            }, void 0, false, {
-                                fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 125,
-                                columnNumber: 9
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
-                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authForm,
-                                onSubmit: signIn,
+                            authMode === 'signin' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["Fragment"], {
                                 children: [
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
-                                        children: [
-                                            "Email address",
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
-                                                name: "email",
-                                                type: "email",
-                                                autoComplete: "email",
-                                                placeholder: "you@studio.com",
-                                                required: true
-                                            }, void 0, false, {
-                                                fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 127,
-                                                columnNumber: 31
-                                            }, this)
-                                        ]
-                                    }, void 0, true, {
-                                        fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 127,
-                                        columnNumber: 11
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
-                                        children: [
-                                            "Password",
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
-                                                name: "password",
-                                                type: "password",
-                                                autoComplete: "current-password",
-                                                placeholder: "Enter your password",
-                                                required: true,
-                                                minLength: "4"
-                                            }, void 0, false, {
-                                                fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 128,
-                                                columnNumber: 26
-                                            }, this)
-                                        ]
-                                    }, void 0, true, {
-                                        fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 128,
-                                        columnNumber: 11
-                                    }, this),
-                                    loginError && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authError,
-                                        role: "alert",
-                                        children: loginError
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].overline,
+                                        children: "YOUR BILLING WORKSPACE"
                                     }, void 0, false, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 129,
-                                        columnNumber: 26
+                                        lineNumber: 236,
+                                        columnNumber: 11
                                     }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].buttonPrimary,
-                                        type: "submit",
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
+                                        children: "Welcome back."
+                                    }, void 0, false, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 237,
+                                        columnNumber: 11
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authIntro,
+                                        children: "Sign in to manage your invoices and client details."
+                                    }, void 0, false, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 238,
+                                        columnNumber: 11
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
+                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authForm,
+                                        onSubmit: signIn,
                                         children: [
-                                            "Sign in ",
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                children: "→"
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                children: [
+                                                    "Email address",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                        name: "email",
+                                                        type: "email",
+                                                        autoComplete: "email",
+                                                        placeholder: "you@studio.com",
+                                                        required: true
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 240,
+                                                        columnNumber: 33
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 240,
+                                                columnNumber: 13
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                children: [
+                                                    "Password",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                        name: "password",
+                                                        type: "password",
+                                                        autoComplete: "current-password",
+                                                        placeholder: "Enter your password",
+                                                        required: true,
+                                                        minLength: "4"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 241,
+                                                        columnNumber: 28
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 241,
+                                                columnNumber: 13
+                                            }, this),
+                                            loginError && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authError,
+                                                role: "alert",
+                                                children: loginError
                                             }, void 0, false, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 130,
-                                                columnNumber: 74
+                                                lineNumber: 242,
+                                                columnNumber: 28
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authLink,
+                                                type: "button",
+                                                onClick: ()=>{
+                                                    setAuthMode('reset');
+                                                    setLoginError('');
+                                                    setResetSubmitted(false);
+                                                },
+                                                children: "Forgot password?"
+                                            }, void 0, false, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 243,
+                                                columnNumber: 13
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].buttonPrimary,
+                                                type: "submit",
+                                                children: [
+                                                    "Sign in ",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                        children: "→"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 244,
+                                                        columnNumber: 76
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 244,
+                                                columnNumber: 13
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 130,
+                                        lineNumber: 239,
+                                        columnNumber: 11
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authSwitch,
+                                        children: [
+                                            "New to Titus Ledger? ",
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                type: "button",
+                                                onClick: ()=>{
+                                                    setAuthMode('signup');
+                                                    setLoginError('');
+                                                },
+                                                children: "Create an account"
+                                            }, void 0, false, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 246,
+                                                columnNumber: 65
+                                            }, this)
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 246,
+                                        columnNumber: 11
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authDisclaimer,
+                                        children: "Demo sign-in only. Add an authentication provider before using real accounts."
+                                    }, void 0, false, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 247,
                                         columnNumber: 11
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 126,
-                                columnNumber: 9
+                                lineNumber: 235,
+                                columnNumber: 35
                             }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authDisclaimer,
-                                children: "Local demo sign-in. Credentials are not sent to a server."
-                            }, void 0, false, {
+                            authMode === 'signup' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["Fragment"], {
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].overline,
+                                        children: "PERSONAL ACCOUNT"
+                                    }, void 0, false, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 250,
+                                        columnNumber: 11
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
+                                        children: "Create your account."
+                                    }, void 0, false, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 251,
+                                        columnNumber: 11
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authIntro,
+                                        children: "Create your personal account and add the business or project you invoice for."
+                                    }, void 0, false, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 252,
+                                        columnNumber: 11
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
+                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authForm,
+                                        onSubmit: signUp,
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                children: [
+                                                    "Your name",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                        name: "name",
+                                                        autoComplete: "name",
+                                                        placeholder: "Jordan Davis",
+                                                        required: true
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 254,
+                                                        columnNumber: 29
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 254,
+                                                columnNumber: 13
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                children: [
+                                                    "Email address",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                        name: "email",
+                                                        type: "email",
+                                                        autoComplete: "email",
+                                                        placeholder: "you@studio.com",
+                                                        required: true
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 255,
+                                                        columnNumber: 33
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 255,
+                                                columnNumber: 13
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                children: [
+                                                    "Business or project name",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                        name: "businessName",
+                                                        autoComplete: "organization",
+                                                        placeholder: "Your business or project",
+                                                        required: true
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 256,
+                                                        columnNumber: 44
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 256,
+                                                columnNumber: 13
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                children: [
+                                                    "Business email ",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authOptional,
+                                                        children: "OPTIONAL"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 257,
+                                                        columnNumber: 35
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                        name: "businessEmail",
+                                                        type: "email",
+                                                        autoComplete: "email",
+                                                        placeholder: "Defaults to your account email"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 257,
+                                                        columnNumber: 88
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 257,
+                                                columnNumber: 13
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                children: [
+                                                    "Business address ",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authOptional,
+                                                        children: "OPTIONAL"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 258,
+                                                        columnNumber: 37
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                        name: "businessAddress",
+                                                        autoComplete: "street-address",
+                                                        placeholder: "Street, city, postal code"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 258,
+                                                        columnNumber: 90
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 258,
+                                                columnNumber: 13
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                children: [
+                                                    "Password",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                        name: "password",
+                                                        type: "password",
+                                                        autoComplete: "new-password",
+                                                        placeholder: "At least 8 characters",
+                                                        required: true,
+                                                        minLength: "8"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 259,
+                                                        columnNumber: 28
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 259,
+                                                columnNumber: 13
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                children: [
+                                                    "Confirm password",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                        name: "confirmPassword",
+                                                        type: "password",
+                                                        autoComplete: "new-password",
+                                                        placeholder: "Enter your password again",
+                                                        required: true,
+                                                        minLength: "8"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 260,
+                                                        columnNumber: 36
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 260,
+                                                columnNumber: 13
+                                            }, this),
+                                            loginError && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authError,
+                                                role: "alert",
+                                                children: loginError
+                                            }, void 0, false, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 261,
+                                                columnNumber: 28
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].buttonPrimary,
+                                                type: "submit",
+                                                children: [
+                                                    "Create account ",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                        children: "→"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 262,
+                                                        columnNumber: 83
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 262,
+                                                columnNumber: 13
+                                            }, this)
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 253,
+                                        columnNumber: 11
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authSwitch,
+                                        children: [
+                                            "Already have an account? ",
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                type: "button",
+                                                onClick: ()=>{
+                                                    setAuthMode('signin');
+                                                    setLoginError('');
+                                                },
+                                                children: "Sign in"
+                                            }, void 0, false, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 264,
+                                                columnNumber: 69
+                                            }, this)
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 264,
+                                        columnNumber: 11
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authDisclaimer,
+                                        children: "Demo account only. Passwords are not stored or verified."
+                                    }, void 0, false, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 265,
+                                        columnNumber: 11
+                                    }, this)
+                                ]
+                            }, void 0, true, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 132,
-                                columnNumber: 9
+                                lineNumber: 249,
+                                columnNumber: 35
+                            }, this),
+                            authMode === 'reset' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["Fragment"], {
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].overline,
+                                        children: "ACCOUNT RECOVERY"
+                                    }, void 0, false, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 268,
+                                        columnNumber: 11
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
+                                        children: resetSubmitted ? 'Request received.' : 'Forgot password?'
+                                    }, void 0, false, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 269,
+                                        columnNumber: 11
+                                    }, this),
+                                    resetSubmitted ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["Fragment"], {
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authIntro,
+                                                children: "Password recovery email delivery is not set up in this demo, so no email was sent. Connect an authentication provider to enable secure resets."
+                                            }, void 0, false, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 270,
+                                                columnNumber: 31
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].buttonPrimary,
+                                                onClick: ()=>{
+                                                    setAuthMode('signin');
+                                                    setResetSubmitted(false);
+                                                },
+                                                children: "Back to sign in"
+                                            }, void 0, false, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 270,
+                                                columnNumber: 209
+                                            }, this)
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 270,
+                                        columnNumber: 29
+                                    }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["Fragment"], {
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authIntro,
+                                                children: "Enter your account email to request a password reset."
+                                            }, void 0, false, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 271,
+                                                columnNumber: 13
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
+                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authForm,
+                                                onSubmit: requestPasswordReset,
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                        children: [
+                                                            "Email address",
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                                name: "email",
+                                                                type: "email",
+                                                                autoComplete: "email",
+                                                                placeholder: "you@studio.com",
+                                                                required: true
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                lineNumber: 273,
+                                                                columnNumber: 35
+                                                            }, this)
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 273,
+                                                        columnNumber: 15
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].buttonPrimary,
+                                                        type: "submit",
+                                                        children: [
+                                                            "Request reset ",
+                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                                children: "→"
+                                                            }, void 0, false, {
+                                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                lineNumber: 274,
+                                                                columnNumber: 84
+                                                            }, this)
+                                                        ]
+                                                    }, void 0, true, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 274,
+                                                        columnNumber: 15
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 272,
+                                                columnNumber: 13
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authSwitch,
+                                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                    type: "button",
+                                                    onClick: ()=>{
+                                                        setAuthMode('signin');
+                                                        setResetSubmitted(false);
+                                                    },
+                                                    children: "← Back to sign in"
+                                                }, void 0, false, {
+                                                    fileName: "[project]/pages/InvoiceApp.jsx",
+                                                    lineNumber: 276,
+                                                    columnNumber: 46
+                                                }, this)
+                                            }, void 0, false, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 276,
+                                                columnNumber: 13
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].authDisclaimer,
+                                                children: "Password recovery email requires a configured authentication provider."
+                                            }, void 0, false, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 277,
+                                                columnNumber: 13
+                                            }, this)
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 270,
+                                        columnNumber: 348
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                lineNumber: 267,
+                                columnNumber: 34
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/pages/InvoiceApp.jsx",
-                        lineNumber: 122,
+                        lineNumber: 234,
                         columnNumber: 7
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -401,26 +987,26 @@ function InvoiceApp() {
                                 children: "·"
                             }, void 0, false, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 134,
+                                lineNumber: 281,
                                 columnNumber: 53
                             }, this),
                             " SIMPLE BILLING, BEAUTIFULLY HANDLED"
                         ]
                     }, void 0, true, {
                         fileName: "[project]/pages/InvoiceApp.jsx",
-                        lineNumber: 134,
+                        lineNumber: 281,
                         columnNumber: 7
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/pages/InvoiceApp.jsx",
-                lineNumber: 120,
+                lineNumber: 232,
                 columnNumber: 5
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/pages/InvoiceApp.jsx",
-        lineNumber: 118,
+        lineNumber: 230,
         columnNumber: 25
     }, this);
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -432,7 +1018,7 @@ function InvoiceApp() {
                         children: "Titus Ledger | Invoices"
                     }, void 0, false, {
                         fileName: "[project]/pages/InvoiceApp.jsx",
-                        lineNumber: 140,
+                        lineNumber: 287,
                         columnNumber: 7
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("meta", {
@@ -440,13 +1026,13 @@ function InvoiceApp() {
                         content: "Create, manage, and print professional invoices."
                     }, void 0, false, {
                         fileName: "[project]/pages/InvoiceApp.jsx",
-                        lineNumber: 141,
+                        lineNumber: 288,
                         columnNumber: 7
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/pages/InvoiceApp.jsx",
-                lineNumber: 139,
+                lineNumber: 286,
                 columnNumber: 5
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("aside", {
@@ -461,7 +1047,7 @@ function InvoiceApp() {
                                 children: "TL"
                             }, void 0, false, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 144,
+                                lineNumber: 291,
                                 columnNumber: 60
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -472,19 +1058,19 @@ function InvoiceApp() {
                                         children: "."
                                     }, void 0, false, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 144,
+                                        lineNumber: 291,
                                         columnNumber: 122
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 144,
+                                lineNumber: 291,
                                 columnNumber: 104
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/pages/InvoiceApp.jsx",
-                        lineNumber: 144,
+                        lineNumber: 291,
                         columnNumber: 7
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -492,7 +1078,7 @@ function InvoiceApp() {
                         children: "WORKSPACE"
                     }, void 0, false, {
                         fileName: "[project]/pages/InvoiceApp.jsx",
-                        lineNumber: 145,
+                        lineNumber: 292,
                         columnNumber: 7
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("nav", {
@@ -507,7 +1093,7 @@ function InvoiceApp() {
                                         children: "▤"
                                     }, void 0, false, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 147,
+                                        lineNumber: 294,
                                         columnNumber: 117
                                     }, this),
                                     " Invoices ",
@@ -515,13 +1101,13 @@ function InvoiceApp() {
                                         children: invoices.length
                                     }, void 0, false, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 147,
+                                        lineNumber: 294,
                                         columnNumber: 141
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 147,
+                                lineNumber: 294,
                                 columnNumber: 9
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -532,20 +1118,20 @@ function InvoiceApp() {
                                         children: "♙"
                                     }, void 0, false, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 148,
+                                        lineNumber: 295,
                                         columnNumber: 119
                                     }, this),
                                     " Clients"
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 148,
+                                lineNumber: 295,
                                 columnNumber: 9
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/pages/InvoiceApp.jsx",
-                        lineNumber: 146,
+                        lineNumber: 293,
                         columnNumber: 7
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -556,7 +1142,7 @@ function InvoiceApp() {
                                 children: authUser.name.split(' ').map((part)=>part[0]).join('').slice(0, 2).toUpperCase()
                             }, void 0, false, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 150,
+                                lineNumber: 297,
                                 columnNumber: 42
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -565,30 +1151,30 @@ function InvoiceApp() {
                                         children: authUser.name
                                     }, void 0, false, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 150,
+                                        lineNumber: 297,
                                         columnNumber: 168
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("small", {
                                         children: authUser.email
                                     }, void 0, false, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 150,
+                                        lineNumber: 297,
                                         columnNumber: 200
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 150,
+                                lineNumber: 297,
                                 columnNumber: 163
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                "aria-label": "Account options",
+                                "aria-label": "Open account menu",
                                 "aria-expanded": accountOpen,
                                 onClick: ()=>setAccountOpen(!accountOpen),
                                 children: "···"
                             }, void 0, false, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 150,
+                                lineNumber: 297,
                                 columnNumber: 237
                             }, this),
                             accountOpen && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -598,8 +1184,8 @@ function InvoiceApp() {
                                         children: authUser.email
                                     }, void 0, false, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 150,
-                                        columnNumber: 411
+                                        lineNumber: 297,
+                                        columnNumber: 413
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                         onClick: signOut,
@@ -609,31 +1195,31 @@ function InvoiceApp() {
                                                 children: "Log out"
                                             }, void 0, false, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 150,
-                                                columnNumber: 472
+                                                lineNumber: 297,
+                                                columnNumber: 474
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 150,
-                                        columnNumber: 444
+                                        lineNumber: 297,
+                                        columnNumber: 446
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 150,
-                                columnNumber: 375
+                                lineNumber: 297,
+                                columnNumber: 377
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/pages/InvoiceApp.jsx",
-                        lineNumber: 150,
+                        lineNumber: 297,
                         columnNumber: 7
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/pages/InvoiceApp.jsx",
-                lineNumber: 143,
+                lineNumber: 290,
                 columnNumber: 5
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("main", {
@@ -651,7 +1237,7 @@ function InvoiceApp() {
                                         children: "/"
                                     }, void 0, false, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 154,
+                                        lineNumber: 301,
                                         columnNumber: 86
                                     }, this),
                                     " ",
@@ -659,13 +1245,13 @@ function InvoiceApp() {
                                         children: activeView === 'editor' ? 'Invoices' : 'Clients'
                                     }, void 0, false, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 154,
+                                        lineNumber: 301,
                                         columnNumber: 101
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 154,
+                                lineNumber: 301,
                                 columnNumber: 41
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -676,14 +1262,14 @@ function InvoiceApp() {
                                         children: [
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("i", {}, void 0, false, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 154,
+                                                lineNumber: 301,
                                                 columnNumber: 236
                                             }, this),
                                             " All changes saved"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 154,
+                                        lineNumber: 301,
                                         columnNumber: 200
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -692,67 +1278,340 @@ function InvoiceApp() {
                                         children: "?"
                                     }, void 0, false, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 154,
+                                        lineNumber: 301,
                                         columnNumber: 266
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 154,
+                                lineNumber: 301,
                                 columnNumber: 164
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/pages/InvoiceApp.jsx",
-                        lineNumber: 154,
+                        lineNumber: 301,
                         columnNumber: 7
                     }, this),
                     activeView === 'clients' ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
-                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].emptyClients,
+                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].clientsPage,
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].emptyIcon,
-                                children: "♙"
+                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].clientsHeading,
+                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    children: [
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                            className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].overline,
+                                            children: "CLIENT DIRECTORY"
+                                        }, void 0, false, {
+                                            fileName: "[project]/pages/InvoiceApp.jsx",
+                                            lineNumber: 303,
+                                            columnNumber: 53
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
+                                            children: [
+                                                "Clients",
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                    className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].headingCount,
+                                                    children: clients.length
+                                                }, void 0, false, {
+                                                    fileName: "[project]/pages/InvoiceApp.jsx",
+                                                    lineNumber: 303,
+                                                    columnNumber: 115
+                                                }, this)
+                                            ]
+                                        }, void 0, true, {
+                                            fileName: "[project]/pages/InvoiceApp.jsx",
+                                            lineNumber: 303,
+                                            columnNumber: 104
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                            className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].headingSub,
+                                            children: "Keep client details handy for your next invoice."
+                                        }, void 0, false, {
+                                            fileName: "[project]/pages/InvoiceApp.jsx",
+                                            lineNumber: 303,
+                                            columnNumber: 181
+                                        }, this)
+                                    ]
+                                }, void 0, true, {
+                                    fileName: "[project]/pages/InvoiceApp.jsx",
+                                    lineNumber: 303,
+                                    columnNumber: 48
+                                }, this)
                             }, void 0, false, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 155,
-                                columnNumber: 76
+                                lineNumber: 303,
+                                columnNumber: 9
                             }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].overline,
-                                children: "CLIENT DIRECTORY"
-                            }, void 0, false, {
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
+                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].clientForm,
+                                onSubmit: addClient,
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].formHeading,
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                children: "＋"
+                                            }, void 0, false, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 305,
+                                                columnNumber: 47
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
+                                                children: "Add a client"
+                                            }, void 0, false, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 305,
+                                                columnNumber: 61
+                                            }, this)
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 305,
+                                        columnNumber: 11
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].clientFormFields,
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                children: [
+                                                    "Client name",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                        autoFocus: true,
+                                                        value: clientForm.name,
+                                                        onChange: (event)=>setClientForm((current)=>({
+                                                                    ...current,
+                                                                    name: event.target.value
+                                                                })),
+                                                        placeholder: "e.g. Acme Studio",
+                                                        required: true
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 307,
+                                                        columnNumber: 31
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 307,
+                                                columnNumber: 13
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                children: [
+                                                    "Email address ",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                        children: "OPTIONAL"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 308,
+                                                        columnNumber: 34
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                        type: "email",
+                                                        value: clientForm.email,
+                                                        onChange: (event)=>setClientForm((current)=>({
+                                                                    ...current,
+                                                                    email: event.target.value
+                                                                })),
+                                                        placeholder: "billing@company.com"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 308,
+                                                        columnNumber: 55
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 308,
+                                                columnNumber: 13
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                children: [
+                                                    "Billing address ",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                        children: "OPTIONAL"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 309,
+                                                        columnNumber: 36
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                        value: clientForm.address,
+                                                        onChange: (event)=>setClientForm((current)=>({
+                                                                    ...current,
+                                                                    address: event.target.value
+                                                                })),
+                                                        placeholder: "Street, city, postal code"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 309,
+                                                        columnNumber: 57
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 309,
+                                                columnNumber: 13
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                type: "submit",
+                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].buttonPrimary,
+                                                children: [
+                                                    "Add client ",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                        children: "＋"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 310,
+                                                        columnNumber: 79
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 310,
+                                                columnNumber: 13
+                                            }, this)
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 306,
+                                        columnNumber: 11
+                                    }, this),
+                                    clientError && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].clientError,
+                                        role: "alert",
+                                        children: clientError
+                                    }, void 0, false, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 312,
+                                        columnNumber: 27
+                                    }, this)
+                                ]
+                            }, void 0, true, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 155,
-                                columnNumber: 117
+                                lineNumber: 304,
+                                columnNumber: 9
                             }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
-                                children: "Your clients live in your invoices."
-                            }, void 0, false, {
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].clientListHead,
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
+                                        children: "All clients"
+                                    }, void 0, false, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 314,
+                                        columnNumber: 48
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                        children: [
+                                            clients.length,
+                                            " ",
+                                            clients.length === 1 ? 'client' : 'clients'
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 314,
+                                        columnNumber: 68
+                                    }, this)
+                                ]
+                            }, void 0, true, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 155,
-                                columnNumber: 168
+                                lineNumber: 314,
+                                columnNumber: 9
                             }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                children: "Client details appear here as you create invoices. Start with a new invoice to add your first client."
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].clientList,
+                                children: clients.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].tableEmpty,
+                                    children: "No clients yet. Add a client above to get started."
+                                }, void 0, false, {
+                                    fileName: "[project]/pages/InvoiceApp.jsx",
+                                    lineNumber: 316,
+                                    columnNumber: 35
+                                }, this) : clients.map((client)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].clientRow,
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].clientAvatar,
+                                                children: client.name.trim().split(/\s+/).slice(0, 2).map((part)=>part[0]).join('').toUpperCase()
+                                            }, void 0, false, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 316,
+                                                columnNumber: 203
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].clientIdentity,
+                                                children: [
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                        children: client.name
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 316,
+                                                        columnNumber: 376
+                                                    }, this),
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                        children: client.email || 'No email added'
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 316,
+                                                        columnNumber: 406
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 316,
+                                                columnNumber: 337
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].clientAddress,
+                                                children: client.address || 'No address added'
+                                            }, void 0, false, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 316,
+                                                columnNumber: 459
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].clientUseButton,
+                                                onClick: ()=>{
+                                                    setInvoice((current)=>({
+                                                            ...current,
+                                                            client: client.name,
+                                                            email: client.email,
+                                                            address: client.address
+                                                        }));
+                                                    setActiveView('editor');
+                                                },
+                                                children: [
+                                                    "Create invoice ",
+                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                        children: "↗"
+                                                    }, void 0, false, {
+                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                        lineNumber: 316,
+                                                        columnNumber: 753
+                                                    }, this)
+                                                ]
+                                            }, void 0, true, {
+                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                lineNumber: 316,
+                                                columnNumber: 541
+                                            }, this)
+                                        ]
+                                    }, client.id, true, {
+                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                        lineNumber: 316,
+                                        columnNumber: 153
+                                    }, this))
                             }, void 0, false, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 155,
-                                columnNumber: 212
-                            }, this),
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].buttonPrimary,
-                                onClick: startNew,
-                                children: "＋ New invoice"
-                            }, void 0, false, {
-                                fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 155,
-                                columnNumber: 320
+                                lineNumber: 315,
+                                columnNumber: 9
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/pages/InvoiceApp.jsx",
-                        lineNumber: 155,
+                        lineNumber: 302,
                         columnNumber: 35
                     }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["Fragment"], {
                         children: [
@@ -773,7 +1632,7 @@ function InvoiceApp() {
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 156,
+                                                lineNumber: 319,
                                                 columnNumber: 54
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
@@ -784,13 +1643,13 @@ function InvoiceApp() {
                                                         children: invoices.length
                                                     }, void 0, false, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 156,
+                                                        lineNumber: 319,
                                                         columnNumber: 215
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 156,
+                                                lineNumber: 319,
                                                 columnNumber: 203
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -798,13 +1657,13 @@ function InvoiceApp() {
                                                 children: "Create and keep track of your client billing."
                                             }, void 0, false, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 156,
+                                                lineNumber: 319,
                                                 columnNumber: 282
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 156,
+                                        lineNumber: 319,
                                         columnNumber: 49
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -815,20 +1674,20 @@ function InvoiceApp() {
                                                 children: "＋"
                                             }, void 0, false, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 156,
+                                                lineNumber: 319,
                                                 columnNumber: 430
                                             }, this),
                                             " New invoice"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 156,
+                                        lineNumber: 319,
                                         columnNumber: 370
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 156,
+                                lineNumber: 319,
                                 columnNumber: 9
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
@@ -841,14 +1700,14 @@ function InvoiceApp() {
                                                 children: "OUTSTANDING"
                                             }, void 0, false, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 159,
+                                                lineNumber: 322,
                                                 columnNumber: 16
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
                                                 children: money(outstandingTotal, 'USD')
                                             }, void 0, false, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 159,
+                                                lineNumber: 322,
                                                 columnNumber: 40
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("small", {
@@ -858,13 +1717,13 @@ function InvoiceApp() {
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 159,
+                                                lineNumber: 322,
                                                 columnNumber: 89
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 159,
+                                        lineNumber: 322,
                                         columnNumber: 11
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -873,14 +1732,14 @@ function InvoiceApp() {
                                                 children: "PAID THIS YEAR"
                                             }, void 0, false, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 160,
+                                                lineNumber: 323,
                                                 columnNumber: 16
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
                                                 children: money(paidTotal, 'USD')
                                             }, void 0, false, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 160,
+                                                lineNumber: 323,
                                                 columnNumber: 43
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("small", {
@@ -890,13 +1749,13 @@ function InvoiceApp() {
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 160,
+                                                lineNumber: 323,
                                                 columnNumber: 85
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 160,
+                                        lineNumber: 323,
                                         columnNumber: 11
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -905,33 +1764,33 @@ function InvoiceApp() {
                                                 children: "ALL INVOICES"
                                             }, void 0, false, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 161,
+                                                lineNumber: 324,
                                                 columnNumber: 16
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
                                                 children: String(invoices.length).padStart(2, '0')
                                             }, void 0, false, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 161,
+                                                lineNumber: 324,
                                                 columnNumber: 41
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("small", {
                                                 children: "Across all clients"
                                             }, void 0, false, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 161,
+                                                lineNumber: 324,
                                                 columnNumber: 100
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 161,
+                                        lineNumber: 324,
                                         columnNumber: 11
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 158,
+                                lineNumber: 321,
                                 columnNumber: 9
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -950,20 +1809,20 @@ function InvoiceApp() {
                                                                 children: "INVOICE EDITOR"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 166,
+                                                                lineNumber: 329,
                                                                 columnNumber: 55
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
                                                                 children: invoice.id
                                                             }, void 0, false, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 166,
+                                                                lineNumber: 329,
                                                                 columnNumber: 104
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 166,
+                                                        lineNumber: 329,
                                                         columnNumber: 50
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -971,13 +1830,13 @@ function InvoiceApp() {
                                                         children: invoice.status
                                                     }, void 0, false, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 166,
+                                                        lineNumber: 329,
                                                         columnNumber: 131
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 166,
+                                                lineNumber: 329,
                                                 columnNumber: 13
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -993,81 +1852,199 @@ function InvoiceApp() {
                                                                         children: "01"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 168,
+                                                                        lineNumber: 331,
                                                                         columnNumber: 87
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
-                                                                        children: "From your business"
+                                                                        children: "Your business details"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 168,
+                                                                        lineNumber: 331,
                                                                         columnNumber: 102
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 168,
+                                                                lineNumber: 331,
                                                                 columnNumber: 51
                                                             }, this),
-                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].businessBlock,
+                                                            editingBusiness ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
+                                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].businessEditForm,
+                                                                onSubmit: saveBusiness,
                                                                 children: [
-                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].businessMark,
-                                                                        children: "JD"
-                                                                    }, void 0, false, {
-                                                                        fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 168,
-                                                                        columnNumber: 173
-                                                                    }, this),
-                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
                                                                         children: [
-                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
-                                                                                children: "Jordan Davis Studio"
+                                                                            "Business or project name",
+                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                                                autoFocus: true,
+                                                                                required: true,
+                                                                                value: businessForm.name,
+                                                                                onChange: (event)=>setBusinessForm((current)=>({
+                                                                                            ...current,
+                                                                                            name: event.target.value
+                                                                                        })),
+                                                                                placeholder: "Your business name"
                                                                             }, void 0, false, {
                                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                lineNumber: 168,
-                                                                                columnNumber: 223
-                                                                            }, this),
-                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                                                                children: [
-                                                                                    "hello@jordandavis.studio",
-                                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("br", {}, void 0, false, {
-                                                                                        fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                        lineNumber: 168,
-                                                                                        columnNumber: 286
-                                                                                    }, this),
-                                                                                    "Brooklyn, NY 11211"
-                                                                                ]
-                                                                            }, void 0, true, {
-                                                                                fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                lineNumber: 168,
-                                                                                columnNumber: 259
+                                                                                lineNumber: 331,
+                                                                                columnNumber: 254
                                                                             }, this)
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 168,
-                                                                        columnNumber: 218
+                                                                        lineNumber: 331,
+                                                                        columnNumber: 223
                                                                     }, this),
-                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].textButton,
-                                                                        children: "Edit details"
-                                                                    }, void 0, false, {
+                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                                        children: [
+                                                                            "Contact email",
+                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                                                type: "email",
+                                                                                value: businessForm.email,
+                                                                                onChange: (event)=>setBusinessForm((current)=>({
+                                                                                            ...current,
+                                                                                            email: event.target.value
+                                                                                        })),
+                                                                                placeholder: "you@business.com"
+                                                                            }, void 0, false, {
+                                                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                                lineNumber: 331,
+                                                                                columnNumber: 464
+                                                                            }, this)
+                                                                        ]
+                                                                    }, void 0, true, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 168,
-                                                                        columnNumber: 320
+                                                                        lineNumber: 331,
+                                                                        columnNumber: 444
+                                                                    }, this),
+                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                                        children: [
+                                                                            "Business address",
+                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                                                value: businessForm.address,
+                                                                                onChange: (event)=>setBusinessForm((current)=>({
+                                                                                            ...current,
+                                                                                            address: event.target.value
+                                                                                        })),
+                                                                                placeholder: "Street, city, postal code"
+                                                                            }, void 0, false, {
+                                                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                                lineNumber: 331,
+                                                                                columnNumber: 671
+                                                                            }, this)
+                                                                        ]
+                                                                    }, void 0, true, {
+                                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                        lineNumber: 331,
+                                                                        columnNumber: 648
+                                                                    }, this),
+                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].businessEditActions,
+                                                                        children: [
+                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                                                type: "button",
+                                                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].buttonQuiet,
+                                                                                onClick: ()=>{
+                                                                                    setBusinessForm(business);
+                                                                                    setEditingBusiness(false);
+                                                                                },
+                                                                                children: "Cancel"
+                                                                            }, void 0, false, {
+                                                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                                lineNumber: 331,
+                                                                                columnNumber: 899
+                                                                            }, this),
+                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                                                type: "submit",
+                                                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].buttonPrimary,
+                                                                                children: "Save details"
+                                                                            }, void 0, false, {
+                                                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                                lineNumber: 331,
+                                                                                columnNumber: 1040
+                                                                            }, this)
+                                                                        ]
+                                                                    }, void 0, true, {
+                                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                        lineNumber: 331,
+                                                                        columnNumber: 855
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 168,
-                                                                columnNumber: 135
+                                                                lineNumber: 331,
+                                                                columnNumber: 157
+                                                            }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].businessBlock,
+                                                                children: [
+                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].businessMark,
+                                                                        children: businessInitials(business.name)
+                                                                    }, void 0, false, {
+                                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                        lineNumber: 331,
+                                                                        columnNumber: 1170
+                                                                    }, this),
+                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                                        children: [
+                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
+                                                                                children: business.name || 'Add your business or project name'
+                                                                            }, void 0, false, {
+                                                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                                lineNumber: 331,
+                                                                                columnNumber: 1251
+                                                                            }, this),
+                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                                                children: [
+                                                                                    business.email || 'Add a contact email',
+                                                                                    business.address && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["Fragment"], {
+                                                                                        children: [
+                                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("br", {}, void 0, false, {
+                                                                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                                                lineNumber: 331,
+                                                                                                columnNumber: 1389
+                                                                                            }, this),
+                                                                                            business.address
+                                                                                        ]
+                                                                                    }, void 0, true, {
+                                                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                                        lineNumber: 331,
+                                                                                        columnNumber: 1387
+                                                                                    }, this)
+                                                                                ]
+                                                                            }, void 0, true, {
+                                                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                                lineNumber: 331,
+                                                                                columnNumber: 1322
+                                                                            }, this)
+                                                                        ]
+                                                                    }, void 0, true, {
+                                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                        lineNumber: 331,
+                                                                        columnNumber: 1246
+                                                                    }, this),
+                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].textButton,
+                                                                        onClick: ()=>{
+                                                                            setBusinessForm(business);
+                                                                            setEditingBusiness(true);
+                                                                        },
+                                                                        children: business.name ? 'Edit details' : 'Add details'
+                                                                    }, void 0, false, {
+                                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                        lineNumber: 331,
+                                                                        columnNumber: 1427
+                                                                    }, this)
+                                                                ]
+                                                            }, void 0, true, {
+                                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                lineNumber: 331,
+                                                                columnNumber: 1132
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 168,
+                                                        lineNumber: 331,
                                                         columnNumber: 15
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1080,25 +2057,61 @@ function InvoiceApp() {
                                                                         children: "02"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 170,
+                                                                        lineNumber: 333,
                                                                         columnNumber: 87
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
                                                                         children: "Bill to"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 170,
+                                                                        lineNumber: 333,
                                                                         columnNumber: 102
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 170,
+                                                                lineNumber: 333,
                                                                 columnNumber: 51
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                                                 className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].formGrid,
                                                                 children: [
+                                                                    clients.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                                        className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].fullField,
+                                                                        children: [
+                                                                            "Select saved client",
+                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("select", {
+                                                                                defaultValue: "",
+                                                                                onChange: (event)=>selectClient(event.target.value),
+                                                                                children: [
+                                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
+                                                                                        value: "",
+                                                                                        children: "Choose a client..."
+                                                                                    }, void 0, false, {
+                                                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                                        lineNumber: 333,
+                                                                                        columnNumber: 314
+                                                                                    }, this),
+                                                                                    clients.map((client)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("option", {
+                                                                                            value: client.id,
+                                                                                            children: client.name
+                                                                                        }, client.id, false, {
+                                                                                            fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                                            lineNumber: 333,
+                                                                                            columnNumber: 383
+                                                                                        }, this))
+                                                                                ]
+                                                                            }, void 0, true, {
+                                                                                fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                                lineNumber: 333,
+                                                                                columnNumber: 235
+                                                                            }, this)
+                                                                        ]
+                                                                    }, void 0, true, {
+                                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                        lineNumber: 333,
+                                                                        columnNumber: 180
+                                                                    }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
                                                                         className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].fullField,
                                                                         children: [
@@ -1109,14 +2122,14 @@ function InvoiceApp() {
                                                                                 placeholder: "e.g. Acme Studio"
                                                                             }, void 0, false, {
                                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                lineNumber: 170,
-                                                                                columnNumber: 210
+                                                                                lineNumber: 333,
+                                                                                columnNumber: 520
                                                                             }, this)
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 170,
-                                                                        columnNumber: 157
+                                                                        lineNumber: 333,
+                                                                        columnNumber: 467
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
                                                                         children: [
@@ -1128,14 +2141,14 @@ function InvoiceApp() {
                                                                                 placeholder: "billing@company.com"
                                                                             }, void 0, false, {
                                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                lineNumber: 170,
-                                                                                columnNumber: 360
+                                                                                lineNumber: 333,
+                                                                                columnNumber: 670
                                                                             }, this)
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 170,
-                                                                        columnNumber: 340
+                                                                        lineNumber: 333,
+                                                                        columnNumber: 650
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
                                                                         children: [
@@ -1147,19 +2160,19 @@ function InvoiceApp() {
                                                                                         children: currency
                                                                                     }, currency, false, {
                                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                        lineNumber: 170,
-                                                                                        columnNumber: 643
+                                                                                        lineNumber: 333,
+                                                                                        columnNumber: 953
                                                                                     }, this))
                                                                             }, void 0, false, {
                                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                lineNumber: 170,
-                                                                                columnNumber: 519
+                                                                                lineNumber: 333,
+                                                                                columnNumber: 829
                                                                             }, this)
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 170,
-                                                                        columnNumber: 504
+                                                                        lineNumber: 333,
+                                                                        columnNumber: 814
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
                                                                         className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].fullField,
@@ -1171,25 +2184,25 @@ function InvoiceApp() {
                                                                                 placeholder: "Street, city, postal code"
                                                                             }, void 0, false, {
                                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                lineNumber: 170,
-                                                                                columnNumber: 755
+                                                                                lineNumber: 333,
+                                                                                columnNumber: 1065
                                                                             }, this)
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 170,
-                                                                        columnNumber: 704
+                                                                        lineNumber: 333,
+                                                                        columnNumber: 1014
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 170,
+                                                                lineNumber: 333,
                                                                 columnNumber: 124
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 170,
+                                                        lineNumber: 333,
                                                         columnNumber: 15
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1202,20 +2215,20 @@ function InvoiceApp() {
                                                                         children: "03"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 172,
+                                                                        lineNumber: 335,
                                                                         columnNumber: 87
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
                                                                         children: "Line items"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 172,
+                                                                        lineNumber: 335,
                                                                         columnNumber: 102
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 172,
+                                                                lineNumber: 335,
                                                                 columnNumber: 51
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1225,39 +2238,39 @@ function InvoiceApp() {
                                                                         children: "DESCRIPTION"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 172,
+                                                                        lineNumber: 335,
                                                                         columnNumber: 163
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                                         children: "QTY"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 172,
+                                                                        lineNumber: 335,
                                                                         columnNumber: 187
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                                         children: "RATE"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 172,
+                                                                        lineNumber: 335,
                                                                         columnNumber: 203
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                                         children: "AMOUNT"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 172,
+                                                                        lineNumber: 335,
                                                                         columnNumber: 220
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("i", {}, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 172,
+                                                                        lineNumber: 335,
                                                                         columnNumber: 239
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 172,
+                                                                lineNumber: 335,
                                                                 columnNumber: 127
                                                             }, this),
                                                             invoice.items.map((item)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1270,7 +2283,7 @@ function InvoiceApp() {
                                                                             placeholder: "What did you work on?"
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                            lineNumber: 172,
+                                                                            lineNumber: 335,
                                                                             columnNumber: 325
                                                                         }, this),
                                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -1281,7 +2294,7 @@ function InvoiceApp() {
                                                                             onChange: (event)=>updateItem(item.id, 'quantity', event.target.value)
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                            lineNumber: 172,
+                                                                            lineNumber: 335,
                                                                             columnNumber: 502
                                                                         }, this),
                                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1291,7 +2304,7 @@ function InvoiceApp() {
                                                                                     children: invoice.currency === 'USD' ? '$' : invoice.currency === 'EUR' ? '€' : invoice.currency === 'GBP' ? '£' : '₦'
                                                                                 }, void 0, false, {
                                                                                     fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                    lineNumber: 172,
+                                                                                    lineNumber: 335,
                                                                                     columnNumber: 685
                                                                                 }, this),
                                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
@@ -1302,20 +2315,20 @@ function InvoiceApp() {
                                                                                     onChange: (event)=>updateItem(item.id, 'rate', event.target.value)
                                                                                 }, void 0, false, {
                                                                                     fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                    lineNumber: 172,
+                                                                                    lineNumber: 335,
                                                                                     columnNumber: 808
                                                                                 }, this)
                                                                             ]
                                                                         }, void 0, true, {
                                                                             fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                            lineNumber: 172,
+                                                                            lineNumber: 335,
                                                                             columnNumber: 651
                                                                         }, this),
                                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
                                                                             children: money(Number(item.quantity || 0) * Number(item.rate || 0), invoice.currency)
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                            lineNumber: 172,
+                                                                            lineNumber: 335,
                                                                             columnNumber: 951
                                                                         }, this),
                                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -1325,13 +2338,13 @@ function InvoiceApp() {
                                                                             children: "×"
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                            lineNumber: 172,
+                                                                            lineNumber: 335,
                                                                             columnNumber: 1046
                                                                         }, this)
                                                                     ]
                                                                 }, item.id, true, {
                                                                     fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                    lineNumber: 172,
+                                                                    lineNumber: 335,
                                                                     columnNumber: 279
                                                                 }, this)),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -1348,13 +2361,13 @@ function InvoiceApp() {
                                                                 children: "＋ Add line item"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 172,
+                                                                lineNumber: 335,
                                                                 columnNumber: 1217
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 172,
+                                                        lineNumber: 335,
                                                         columnNumber: 15
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1367,20 +2380,20 @@ function InvoiceApp() {
                                                                         children: "04"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 174,
+                                                                        lineNumber: 337,
                                                                         columnNumber: 87
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
                                                                         children: "Dates & notes"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 174,
+                                                                        lineNumber: 337,
                                                                         columnNumber: 102
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 174,
+                                                                lineNumber: 337,
                                                                 columnNumber: 51
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1395,13 +2408,13 @@ function InvoiceApp() {
                                                                                 onChange: (event)=>update('issueDate', event.target.value)
                                                                             }, void 0, false, {
                                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                lineNumber: 174,
+                                                                                lineNumber: 337,
                                                                                 columnNumber: 180
                                                                             }, this)
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 174,
+                                                                        lineNumber: 337,
                                                                         columnNumber: 163
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
@@ -1413,13 +2426,13 @@ function InvoiceApp() {
                                                                                 onChange: (event)=>update('dueDate', event.target.value)
                                                                             }, void 0, false, {
                                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                lineNumber: 174,
+                                                                                lineNumber: 337,
                                                                                 columnNumber: 312
                                                                             }, this)
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 174,
+                                                                        lineNumber: 337,
                                                                         columnNumber: 297
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
@@ -1430,7 +2443,7 @@ function InvoiceApp() {
                                                                                 children: "OPTIONAL"
                                                                             }, void 0, false, {
                                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                lineNumber: 174,
+                                                                                lineNumber: 337,
                                                                                 columnNumber: 441
                                                                             }, this),
                                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1443,26 +2456,26 @@ function InvoiceApp() {
                                                                                         onChange: (event)=>update('tax', event.target.value)
                                                                                     }, void 0, false, {
                                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                        lineNumber: 174,
+                                                                                        lineNumber: 337,
                                                                                         columnNumber: 528
                                                                                     }, this),
                                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                                                         children: "%"
                                                                                     }, void 0, false, {
                                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                        lineNumber: 174,
+                                                                                        lineNumber: 337,
                                                                                         columnNumber: 635
                                                                                     }, this)
                                                                                 ]
                                                                             }, void 0, true, {
                                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                lineNumber: 174,
+                                                                                lineNumber: 337,
                                                                                 columnNumber: 495
                                                                             }, this)
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 174,
+                                                                        lineNumber: 337,
                                                                         columnNumber: 425
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
@@ -1475,25 +2488,25 @@ function InvoiceApp() {
                                                                                 rows: "2"
                                                                             }, void 0, false, {
                                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                lineNumber: 174,
+                                                                                lineNumber: 337,
                                                                                 columnNumber: 713
                                                                             }, this)
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 174,
+                                                                        lineNumber: 337,
                                                                         columnNumber: 663
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 174,
+                                                                lineNumber: 337,
                                                                 columnNumber: 130
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 174,
+                                                        lineNumber: 337,
                                                         columnNumber: 15
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1505,7 +2518,7 @@ function InvoiceApp() {
                                                                 children: "Save draft"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 176,
+                                                                lineNumber: 339,
                                                                 columnNumber: 53
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -1517,31 +2530,31 @@ function InvoiceApp() {
                                                                         children: "↗"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 176,
+                                                                        lineNumber: 339,
                                                                         columnNumber: 224
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 176,
+                                                                lineNumber: 339,
                                                                 columnNumber: 141
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 176,
+                                                        lineNumber: 339,
                                                         columnNumber: 15
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 167,
+                                                lineNumber: 330,
                                                 columnNumber: 13
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 165,
+                                        lineNumber: 328,
                                         columnNumber: 11
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("aside", {
@@ -1557,20 +2570,20 @@ function InvoiceApp() {
                                                                 children: "LIVE PREVIEW"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 180,
+                                                                lineNumber: 343,
                                                                 columnNumber: 91
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                                 children: "Updates as you edit"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 180,
+                                                                lineNumber: 343,
                                                                 columnNumber: 138
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 180,
+                                                        lineNumber: 343,
                                                         columnNumber: 86
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -1581,13 +2594,13 @@ function InvoiceApp() {
                                                         children: "⎙"
                                                     }, void 0, false, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 180,
+                                                        lineNumber: 343,
                                                         columnNumber: 176
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 180,
+                                                lineNumber: 343,
                                                 columnNumber: 51
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("article", {
@@ -1599,18 +2612,18 @@ function InvoiceApp() {
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                                 className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].paperLogo,
                                                                 children: [
-                                                                    "JD",
+                                                                    businessInitials(business.name),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                                         children: "."
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 182,
-                                                                        columnNumber: 85
+                                                                        lineNumber: 345,
+                                                                        columnNumber: 116
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 182,
+                                                                lineNumber: 345,
                                                                 columnNumber: 48
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -1618,13 +2631,13 @@ function InvoiceApp() {
                                                                 children: "INVOICE"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 182,
-                                                                columnNumber: 106
+                                                                lineNumber: 345,
+                                                                columnNumber: 137
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 182,
+                                                        lineNumber: 345,
                                                         columnNumber: 15
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1632,7 +2645,7 @@ function InvoiceApp() {
                                                         children: invoice.id
                                                     }, void 0, false, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 183,
+                                                        lineNumber: 346,
                                                         columnNumber: 15
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1644,35 +2657,43 @@ function InvoiceApp() {
                                                                         children: "FROM"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 184,
+                                                                        lineNumber: 347,
                                                                         columnNumber: 57
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
-                                                                        children: "Jordan Davis Studio"
+                                                                        children: business.name || 'Your business or project'
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 184,
+                                                                        lineNumber: 347,
                                                                         columnNumber: 74
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                                                                         children: [
-                                                                            "hello@jordandavis.studio",
-                                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("br", {}, void 0, false, {
+                                                                            business.email || 'Your contact email',
+                                                                            business.address && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["Fragment"], {
+                                                                                children: [
+                                                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("br", {}, void 0, false, {
+                                                                                        fileName: "[project]/pages/InvoiceApp.jsx",
+                                                                                        lineNumber: 347,
+                                                                                        columnNumber: 202
+                                                                                    }, this),
+                                                                                    business.address
+                                                                                ]
+                                                                            }, void 0, true, {
                                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                lineNumber: 184,
-                                                                                columnNumber: 137
-                                                                            }, this),
-                                                                            "Brooklyn, NY 11211"
+                                                                                lineNumber: 347,
+                                                                                columnNumber: 200
+                                                                            }, this)
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 184,
-                                                                        columnNumber: 110
+                                                                        lineNumber: 347,
+                                                                        columnNumber: 136
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 184,
+                                                                lineNumber: 347,
                                                                 columnNumber: 52
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1681,41 +2702,41 @@ function InvoiceApp() {
                                                                         children: "BILL TO"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 184,
-                                                                        columnNumber: 176
+                                                                        lineNumber: 347,
+                                                                        columnNumber: 245
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
                                                                         children: invoice.client || 'Client name'
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 184,
-                                                                        columnNumber: 196
+                                                                        lineNumber: 347,
+                                                                        columnNumber: 265
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                                                                         children: [
                                                                             invoice.email || 'client@email.com',
                                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("br", {}, void 0, false, {
                                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                lineNumber: 184,
-                                                                                columnNumber: 286
+                                                                                lineNumber: 347,
+                                                                                columnNumber: 355
                                                                             }, this),
                                                                             invoice.address || 'Billing address'
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 184,
-                                                                        columnNumber: 246
+                                                                        lineNumber: 347,
+                                                                        columnNumber: 315
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 184,
-                                                                columnNumber: 171
+                                                                lineNumber: 347,
+                                                                columnNumber: 240
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 184,
+                                                        lineNumber: 347,
                                                         columnNumber: 15
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1727,20 +2748,20 @@ function InvoiceApp() {
                                                                         children: "ISSUED"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 185,
+                                                                        lineNumber: 348,
                                                                         columnNumber: 55
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
                                                                         children: dateLabel(invoice.issueDate)
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 185,
+                                                                        lineNumber: 348,
                                                                         columnNumber: 74
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 185,
+                                                                lineNumber: 348,
                                                                 columnNumber: 50
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1749,26 +2770,26 @@ function InvoiceApp() {
                                                                         children: "DUE DATE"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 185,
+                                                                        lineNumber: 348,
                                                                         columnNumber: 132
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
                                                                         children: dateLabel(invoice.dueDate)
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 185,
+                                                                        lineNumber: 348,
                                                                         columnNumber: 153
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 185,
+                                                                lineNumber: 348,
                                                                 columnNumber: 127
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 185,
+                                                        lineNumber: 348,
                                                         columnNumber: 15
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1781,20 +2802,20 @@ function InvoiceApp() {
                                                                         children: "DESCRIPTION"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 186,
+                                                                        lineNumber: 349,
                                                                         columnNumber: 88
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                                         children: "AMOUNT"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 186,
+                                                                        lineNumber: 349,
                                                                         columnNumber: 112
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 186,
+                                                                lineNumber: 349,
                                                                 columnNumber: 50
                                                             }, this),
                                                             invoice.items.map((item)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1811,32 +2832,32 @@ function InvoiceApp() {
                                                                                     ]
                                                                                 }, void 0, true, {
                                                                                     fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                                    lineNumber: 186,
+                                                                                    lineNumber: 349,
                                                                                     columnNumber: 252
                                                                                 }, this)
                                                                             ]
                                                                         }, void 0, true, {
                                                                             fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                            lineNumber: 186,
+                                                                            lineNumber: 349,
                                                                             columnNumber: 214
                                                                         }, this),
                                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
                                                                             children: money(Number(item.quantity || 0) * Number(item.rate || 0), invoice.currency)
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                            lineNumber: 186,
+                                                                            lineNumber: 349,
                                                                             columnNumber: 341
                                                                         }, this)
                                                                     ]
                                                                 }, item.id, true, {
                                                                     fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                    lineNumber: 186,
+                                                                    lineNumber: 349,
                                                                     columnNumber: 166
                                                                 }, this))
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 186,
+                                                        lineNumber: 349,
                                                         columnNumber: 15
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1848,20 +2869,20 @@ function InvoiceApp() {
                                                                         children: "Subtotal"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 187,
+                                                                        lineNumber: 350,
                                                                         columnNumber: 56
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
                                                                         children: money(subtotal, invoice.currency)
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 187,
+                                                                        lineNumber: 350,
                                                                         columnNumber: 77
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 187,
+                                                                lineNumber: 350,
                                                                 columnNumber: 51
                                                             }, this),
                                                             Number(invoice.tax) > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1874,20 +2895,20 @@ function InvoiceApp() {
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 187,
+                                                                        lineNumber: 350,
                                                                         columnNumber: 168
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
                                                                         children: money(taxAmount, invoice.currency)
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 187,
+                                                                        lineNumber: 350,
                                                                         columnNumber: 201
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 187,
+                                                                lineNumber: 350,
                                                                 columnNumber: 163
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1897,26 +2918,26 @@ function InvoiceApp() {
                                                                         children: "Total due"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 187,
+                                                                        lineNumber: 350,
                                                                         columnNumber: 296
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
                                                                         children: money(total, invoice.currency)
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                        lineNumber: 187,
+                                                                        lineNumber: 350,
                                                                         columnNumber: 318
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 187,
+                                                                lineNumber: 350,
                                                                 columnNumber: 261
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 187,
+                                                        lineNumber: 350,
                                                         columnNumber: 15
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1926,20 +2947,20 @@ function InvoiceApp() {
                                                                 children: "NOTE"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 188,
+                                                                lineNumber: 351,
                                                                 columnNumber: 49
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                                                                 children: invoice.notes || 'No additional notes.'
                                                             }, void 0, false, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 188,
+                                                                lineNumber: 351,
                                                                 columnNumber: 66
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 188,
+                                                        lineNumber: 351,
                                                         columnNumber: 15
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1950,7 +2971,7 @@ function InvoiceApp() {
                                                                 children: "·"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                lineNumber: 189,
+                                                                lineNumber: 352,
                                                                 columnNumber: 79
                                                             }, this),
                                                             " ",
@@ -1958,13 +2979,13 @@ function InvoiceApp() {
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 189,
+                                                        lineNumber: 352,
                                                         columnNumber: 15
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 181,
+                                                lineNumber: 344,
                                                 columnNumber: 13
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1974,26 +2995,26 @@ function InvoiceApp() {
                                                         children: "↗"
                                                     }, void 0, false, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 191,
+                                                        lineNumber: 354,
                                                         columnNumber: 49
                                                     }, this),
                                                     " Your invoice is ready to print or save as PDF."
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 191,
+                                                lineNumber: 354,
                                                 columnNumber: 13
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 180,
+                                        lineNumber: 343,
                                         columnNumber: 11
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 164,
+                                lineNumber: 327,
                                 columnNumber: 9
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
@@ -2009,20 +3030,20 @@ function InvoiceApp() {
                                                         children: "YOUR WORK"
                                                     }, void 0, false, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 195,
+                                                        lineNumber: 358,
                                                         columnNumber: 94
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
                                                         children: "Recent invoices"
                                                     }, void 0, false, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 195,
+                                                        lineNumber: 358,
                                                         columnNumber: 138
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 195,
+                                                lineNumber: 358,
                                                 columnNumber: 89
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -2036,19 +3057,19 @@ function InvoiceApp() {
                                                         children: "↓"
                                                     }, void 0, false, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 195,
+                                                        lineNumber: 358,
                                                         columnNumber: 317
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 195,
+                                                lineNumber: 358,
                                                 columnNumber: 168
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 195,
+                                        lineNumber: 358,
                                         columnNumber: 51
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2062,46 +3083,46 @@ function InvoiceApp() {
                                                         children: "INVOICE"
                                                     }, void 0, false, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 195,
+                                                        lineNumber: 358,
                                                         columnNumber: 438
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                         children: "CLIENT"
                                                     }, void 0, false, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 195,
+                                                        lineNumber: 358,
                                                         columnNumber: 458
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                         children: "DATE"
                                                     }, void 0, false, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 195,
+                                                        lineNumber: 358,
                                                         columnNumber: 477
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                         children: "AMOUNT"
                                                     }, void 0, false, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 195,
+                                                        lineNumber: 358,
                                                         columnNumber: 494
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                         children: "STATUS"
                                                     }, void 0, false, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 195,
+                                                        lineNumber: 358,
                                                         columnNumber: 513
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("i", {}, void 0, false, {
                                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                                        lineNumber: 195,
+                                                        lineNumber: 358,
                                                         columnNumber: 532
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 195,
+                                                lineNumber: 358,
                                                 columnNumber: 404
                                             }, this),
                                             invoices.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2109,7 +3130,7 @@ function InvoiceApp() {
                                                 children: "Your saved invoices will show up here."
                                             }, void 0, false, {
                                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                                lineNumber: 195,
+                                                lineNumber: 358,
                                                 columnNumber: 568
                                             }, this) : invoices.map((record)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                                     className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].tableRow,
@@ -2120,28 +3141,28 @@ function InvoiceApp() {
                                                             children: record.id
                                                         }, void 0, false, {
                                                             fileName: "[project]/pages/InvoiceApp.jsx",
-                                                            lineNumber: 195,
+                                                            lineNumber: 358,
                                                             columnNumber: 724
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                             children: record.client || 'Untitled client'
                                                         }, void 0, false, {
                                                             fileName: "[project]/pages/InvoiceApp.jsx",
-                                                            lineNumber: 195,
+                                                            lineNumber: 358,
                                                             columnNumber: 819
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                             children: dateLabel(record.issueDate)
                                                         }, void 0, false, {
                                                             fileName: "[project]/pages/InvoiceApp.jsx",
-                                                            lineNumber: 195,
+                                                            lineNumber: 358,
                                                             columnNumber: 868
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
                                                             children: money(record.total, record.currency || 'USD')
                                                         }, void 0, false, {
                                                             fileName: "[project]/pages/InvoiceApp.jsx",
-                                                            lineNumber: 195,
+                                                            lineNumber: 358,
                                                             columnNumber: 910
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2150,14 +3171,14 @@ function InvoiceApp() {
                                                                     className: `${__TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].tableStatus} ${record.status === 'Paid' ? __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].paidStatus : record.status === 'Sent' ? __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].sentStatus : ''}`
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/pages/InvoiceApp.jsx",
-                                                                    lineNumber: 195,
+                                                                    lineNumber: 358,
                                                                     columnNumber: 980
                                                                 }, this),
                                                                 record.status
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/pages/InvoiceApp.jsx",
-                                                            lineNumber: 195,
+                                                            lineNumber: 358,
                                                             columnNumber: 974
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -2167,32 +3188,32 @@ function InvoiceApp() {
                                                             children: record.status === 'Paid' ? '↗' : '✓'
                                                         }, void 0, false, {
                                                             fileName: "[project]/pages/InvoiceApp.jsx",
-                                                            lineNumber: 195,
+                                                            lineNumber: 358,
                                                             columnNumber: 1143
                                                         }, this)
                                                     ]
                                                 }, record.id, true, {
                                                     fileName: "[project]/pages/InvoiceApp.jsx",
-                                                    lineNumber: 195,
+                                                    lineNumber: 358,
                                                     columnNumber: 675
                                                 }, this))
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/pages/InvoiceApp.jsx",
-                                        lineNumber: 195,
+                                        lineNumber: 358,
                                         columnNumber: 346
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 195,
+                                lineNumber: 358,
                                 columnNumber: 9
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/pages/InvoiceApp.jsx",
-                        lineNumber: 155,
-                        columnNumber: 415
+                        lineNumber: 318,
+                        columnNumber: 20
                     }, this),
                     notice && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         className: __TURBOPACK__imported__module__$5b$project$5d2f$pages$2f$index$2e$module$2e$css__$5b$client$5d$__$28$css__module$29$__["default"].toast,
@@ -2203,7 +3224,7 @@ function InvoiceApp() {
                         ]
                     }, void 0, true, {
                         fileName: "[project]/pages/InvoiceApp.jsx",
-                        lineNumber: 197,
+                        lineNumber: 360,
                         columnNumber: 18
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("footer", {
@@ -2213,36 +3234,36 @@ function InvoiceApp() {
                                 children: "TITUS LEDGER"
                             }, void 0, false, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 198,
+                                lineNumber: 361,
                                 columnNumber: 45
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                 children: "Simple billing, beautifully handled."
                             }, void 0, false, {
                                 fileName: "[project]/pages/InvoiceApp.jsx",
-                                lineNumber: 198,
+                                lineNumber: 361,
                                 columnNumber: 70
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/pages/InvoiceApp.jsx",
-                        lineNumber: 198,
+                        lineNumber: 361,
                         columnNumber: 7
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/pages/InvoiceApp.jsx",
-                lineNumber: 153,
+                lineNumber: 300,
                 columnNumber: 5
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/pages/InvoiceApp.jsx",
-        lineNumber: 138,
+        lineNumber: 285,
         columnNumber: 10
     }, this);
 }
-_s(InvoiceApp, "Mihq2bbRh4HaL+mzuSLm+TvCKJ8=");
+_s(InvoiceApp, "HCmuRGZf2U4eyDACUnvEFEEQmGo=");
 _c = InvoiceApp;
 var _c;
 __turbopack_context__.k.register(_c, "InvoiceApp");
@@ -2500,8 +3521,10 @@ __turbopack_context__.v({
   "authFooter": "index-module__KWKY6G__authFooter",
   "authForm": "index-module__KWKY6G__authForm",
   "authIntro": "index-module__KWKY6G__authIntro",
+  "authLink": "index-module__KWKY6G__authLink",
   "authPanel": "index-module__KWKY6G__authPanel",
   "authScreen": "index-module__KWKY6G__authScreen",
+  "authSwitch": "index-module__KWKY6G__authSwitch",
   "avatar": "index-module__KWKY6G__avatar",
   "bodyCopy": "index-module__KWKY6G__bodyCopy",
   "brand": "index-module__KWKY6G__brand",
@@ -2509,10 +3532,24 @@ __turbopack_context__.v({
   "brandMark": "index-module__KWKY6G__brandMark",
   "breadcrumb": "index-module__KWKY6G__breadcrumb",
   "businessBlock": "index-module__KWKY6G__businessBlock",
+  "businessEditActions": "index-module__KWKY6G__businessEditActions",
+  "businessEditForm": "index-module__KWKY6G__businessEditForm",
   "businessMark": "index-module__KWKY6G__businessMark",
   "buttonPrimary": "index-module__KWKY6G__buttonPrimary",
   "buttonQuiet": "index-module__KWKY6G__buttonQuiet",
   "chips": "index-module__KWKY6G__chips",
+  "clientAddress": "index-module__KWKY6G__clientAddress",
+  "clientAvatar": "index-module__KWKY6G__clientAvatar",
+  "clientError": "index-module__KWKY6G__clientError",
+  "clientForm": "index-module__KWKY6G__clientForm",
+  "clientFormFields": "index-module__KWKY6G__clientFormFields",
+  "clientIdentity": "index-module__KWKY6G__clientIdentity",
+  "clientList": "index-module__KWKY6G__clientList",
+  "clientListHead": "index-module__KWKY6G__clientListHead",
+  "clientRow": "index-module__KWKY6G__clientRow",
+  "clientUseButton": "index-module__KWKY6G__clientUseButton",
+  "clientsHeading": "index-module__KWKY6G__clientsHeading",
+  "clientsPage": "index-module__KWKY6G__clientsPage",
   "coinRail": "index-module__KWKY6G__coinRail",
   "coinsSection": "index-module__KWKY6G__coinsSection",
   "contentGrid": "index-module__KWKY6G__contentGrid",

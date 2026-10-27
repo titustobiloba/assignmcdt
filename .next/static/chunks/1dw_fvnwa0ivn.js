@@ -1,0 +1,7 @@
+__turbopack_load_page_chunks__("/InvoiceApp", [
+  "static/chunks/35ttub56asxkh.js",
+  "static/chunks/2d8eojau8dio7.js",
+  "static/chunks/2imk-i558o-m0.js",
+  "static/chunks/0i6ng1_u0asy9.css",
+  "static/chunks/turbopack-2_pz_8ofnwcnd.js"
+])
