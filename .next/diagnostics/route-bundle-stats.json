@@ -1,0 +1,35 @@
+[
+  {
+    "route": "/",
+    "firstLoadUncompressedJsBytes": 384904,
+    "firstLoadChunkPaths": [
+      ".next/static/chunks/24mspnv49xmry.js",
+      ".next/static/chunks/2d8eojau8dio7.js",
+      ".next/static/chunks/3xyfqven255f5.js",
+      ".next/static/chunks/turbopack-344jwky3kxk_0.js",
+      ".next/static/chunks/2qx-mp6eo9myl.js",
+      ".next/static/chunks/turbopack-2kdq77zszof-j.js"
+    ]
+  },
+  {
+    "route": "/InvoiceApp",
+    "firstLoadUncompressedJsBytes": 384730,
+    "firstLoadChunkPaths": [
+      ".next/static/chunks/35bz7fjsri3vm.js",
+      ".next/static/chunks/2d8eojau8dio7.js",
+      ".next/static/chunks/3xyfqven255f5.js",
+      ".next/static/chunks/turbopack-2d0w6bmnvq_2e.js",
+      ".next/static/chunks/2qx-mp6eo9myl.js",
+      ".next/static/chunks/turbopack-2kdq77zszof-j.js"
+    ]
+  },
+  {
+    "route": "/404",
+    "firstLoadUncompressedJsBytes": 334616,
+    "firstLoadChunkPaths": [
+      ".next/static/chunks/2qx-mp6eo9myl.js",
+      ".next/static/chunks/2d8eojau8dio7.js",
+      ".next/static/chunks/turbopack-2kdq77zszof-j.js"
+    ]
+  }
+]

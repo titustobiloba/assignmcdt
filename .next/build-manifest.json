@@ -1,0 +1,39 @@
+{
+  "pages": {
+    "/": [
+      "static/chunks/24mspnv49xmry.js",
+      "static/chunks/2d8eojau8dio7.js",
+      "static/chunks/3xyfqven255f5.js",
+      "static/chunks/1qmuqcj_si746.css",
+      "static/chunks/turbopack-344jwky3kxk_0.js"
+    ],
+    "/InvoiceApp": [
+      "static/chunks/35bz7fjsri3vm.js",
+      "static/chunks/2d8eojau8dio7.js",
+      "static/chunks/3xyfqven255f5.js",
+      "static/chunks/1qmuqcj_si746.css",
+      "static/chunks/turbopack-2d0w6bmnvq_2e.js"
+    ],
+    "/_app": [
+      "static/chunks/2qx-mp6eo9myl.js",
+      "static/chunks/2d8eojau8dio7.js",
+      "static/chunks/turbopack-2kdq77zszof-j.js"
+    ],
+    "/_error": [
+      "static/chunks/1p0ro-wydp320.js",
+      "static/chunks/2d8eojau8dio7.js",
+      "static/chunks/turbopack-3208x8ny43tqp.js"
+    ]
+  },
+  "devFiles": [],
+  "polyfillFiles": [],
+  "lowPriorityFiles": [
+    "static/C18NBa8vofYggBH8m20XK/_buildManifest.js",
+    "static/C18NBa8vofYggBH8m20XK/_ssgManifest.js",
+    "static/C18NBa8vofYggBH8m20XK/_clientMiddlewareManifest.js"
+  ],
+  "rootMainFiles": [],
+  "rootMainFilesTree": {},
+  "pagesChunkGroupBootstrapParams": {},
+  "chunkLoadingGlobal": "TURBOPACK"
+}
