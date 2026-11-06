@@ -189,7 +189,7 @@ export default function InvoiceApp() {
     setLoginError('')
   }
 
-  function signUp(event) {
+  async function signUp(event) {
     event.preventDefault()
     const formData = new FormData(event.currentTarget)
     const password = String(formData.get('password'))
@@ -205,13 +205,34 @@ export default function InvoiceApp() {
       email: String(formData.get('businessEmail')).trim() || email,
       address: String(formData.get('businessAddress')).trim(),
     }
-    const user = { email, name, accountType: 'person' }
-    window.localStorage.setItem('ledger-account', JSON.stringify(user))
-    window.localStorage.setItem(businessStorageKey(email), JSON.stringify(newBusiness))
-    setBusiness(newBusiness)
-    setBusinessForm(newBusiness)
-    setAuthUser(user)
     setLoginError('')
+    try {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          businessName: newBusiness.name,
+          businessEmail: newBusiness.email,
+          businessAddress: newBusiness.address,
+        }),
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        setLoginError(result.error || 'Could not create your account.')
+        return
+      }
+      const user = result.user
+      window.localStorage.setItem('ledger-account', JSON.stringify(user))
+    window.localStorage.setItem(businessStorageKey(email), JSON.stringify(newBusiness))
+      setBusiness(newBusiness)
+      setBusinessForm(newBusiness)
+      setAuthUser(user)
+    } catch {
+      setLoginError('Could not reach the signup service. Check your connection and try again.')
+    }
   }
 
   function requestPasswordReset(event) {
@@ -262,7 +283,7 @@ export default function InvoiceApp() {
             <button className={styles.buttonPrimary} type="submit">Create account <span>→</span></button>
           </form>
           <p className={styles.authSwitch}>Already have an account? <button type="button" onClick={() => { setAuthMode('signin'); setLoginError('') }}>Sign in</button></p>
-          <p className={styles.authDisclaimer}>Demo account only. Passwords are not stored or verified.</p>
+          <p className={styles.authDisclaimer}>Your password is securely hashed before it is saved.</p>
         </>}
         {authMode === 'reset' && <>
           <p className={styles.overline}>ACCOUNT RECOVERY</p>
