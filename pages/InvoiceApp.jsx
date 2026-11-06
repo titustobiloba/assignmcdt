@@ -174,19 +174,32 @@ export default function InvoiceApp() {
     window.setTimeout(() => setNotice(''), 2400)
   }
 
-  function signIn(event) {
+  async function signIn(event) {
     event.preventDefault()
     const formData = new FormData(event.currentTarget)
     const email = String(formData.get('email')).trim().toLowerCase()
-    const name = email.split('@')[0].split(/[._-]/).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')
-    const user = { email, name: name || 'Account', accountType: 'person' }
-    const savedBusiness = window.localStorage.getItem(businessStorageKey(email))
-    const businessDetails = savedBusiness ? { ...defaultBusiness, ...JSON.parse(savedBusiness) } : defaultBusiness
-    window.localStorage.setItem('ledger-account', JSON.stringify(user))
-    setAuthUser(user)
-    setBusiness(businessDetails)
-    setBusinessForm(businessDetails)
     setLoginError('')
+    try {
+      const response = await fetch('/api/auth/signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: String(formData.get('password')) }),
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        setLoginError(result.error || 'Could not sign in.')
+        return
+      }
+      const user = result.user
+      const businessDetails = { ...defaultBusiness, ...user.business }
+      window.localStorage.setItem('ledger-account', JSON.stringify(user))
+      window.localStorage.setItem(businessStorageKey(user.email), JSON.stringify(businessDetails))
+      setAuthUser(user)
+      setBusiness(businessDetails)
+      setBusinessForm(businessDetails)
+    } catch {
+      setLoginError('Could not reach the sign-in service. Check your connection and try again.')
+    }
   }
 
   async function signUp(event) {
@@ -265,7 +278,7 @@ export default function InvoiceApp() {
             <button className={styles.buttonPrimary} type="submit">Sign in <span>→</span></button>
           </form>
           <p className={styles.authSwitch}>New to Titus Ledger? <button type="button" onClick={() => { setAuthMode('signup'); setLoginError('') }}>Create an account</button></p>
-          <p className={styles.authDisclaimer}>Demo sign-in only. Add an authentication provider before using real accounts.</p>
+          <p className={styles.authDisclaimer}>Your email and password are checked against your Titus Ledger account.</p>
         </>}
         {authMode === 'signup' && <>
           <p className={styles.overline}>PERSONAL ACCOUNT</p>
